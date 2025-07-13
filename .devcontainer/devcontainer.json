@@ -1,0 +1,28 @@
+{
+    "name": "MoveIt 2 Humble Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--privileged",
+        "--net=host",
+        "-e", "DISPLAY=${env:DISPLAY}",
+        "--device=/dev/dri/:/dev/dri"
+    ],
+    "workspaceMount": "source=${localWorkspaceFolder},target=/ws_lucas,type=bind",
+    "workspaceFolder": "/ws_lucas",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-python.python",
+                "ms-iot.vscode-ros"
+            ]
+        }
+    },
+    // This command now runs as root by default.
+    "postCreateCommand": "/bin/bash",
+    
+    // Set 'root' as the default user for the container and VS Code terminals.
+    "remoteUser": "root"
+}
