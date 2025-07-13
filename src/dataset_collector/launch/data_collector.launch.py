@@ -24,18 +24,11 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    # MODIFIED: Renamed launch argument and updated default value and description
-    data_collector_script = DeclareLaunchArgument(
-        "data_collector_script",
-        default_value="data_collector",
-        description="The python script to execute for data collection.",
-    )
-
     # MODIFIED: The primary node that runs your data collector script
     data_collector_node = Node(
         name="data_collector", # MODIFIED: Node name
         package=package_name,   # MODIFIED: Your package name
-        executable=LaunchConfiguration("data_collector_script"), # MODIFIED: Use the new launch argument
+        executable="data_collector", # MODIFIED: Use the new launch argument
         output="both",
         parameters=[moveit_config.to_dict()],
     )
@@ -106,7 +99,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            data_collector_script,
             data_collector_node,
             robot_state_publisher,
             ros2_control_node,
