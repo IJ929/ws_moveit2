@@ -8,14 +8,23 @@ def generate_launch_description():
     moveit_config = (
         MoveItConfigsBuilder("panda", package_name="moveit_resources_panda_moveit_config")
         .robot_description(file_path="config/panda.urdf.xacro")
-        .trajectory_execution(file_path="config/gripper_controllers.yaml")
+        .trajectory_execution(file_path="config/moveit_controllers.yaml")
+        .planning_scene_monitor(
+            publish_planning_scene="true",
+            publish_geometry_updates="true",
+            publish_state_updates="true",
+            publish_transforms_updates="true",
+        )
+        .planning_pipelines(
+            pipelines=["ompl", "chomp", "pilz_industrial_motion_planner"]
+        )
         .to_moveit_configs()
     )
 
     # Data collector node
     data_collector_node = Node(
         package="dataset_collector", # Replace with your package name
-        executable="data_collector.py", # Your script's name
+        executable="data_collector", # Your script's name
         name="moveit_py_data_collector",
         output="screen",
         parameters=[moveit_config.to_dict()],
