@@ -1,7 +1,3 @@
-"""
-A launch file for running the motion planning python api tutorial
-"""
-
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -12,6 +8,9 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
+    # MODIFIED: Define the package name
+    package_name = "dataset_collector"
+
     moveit_config = (
         MoveItConfigsBuilder(
             robot_name="panda", package_name="moveit_resources_panda_moveit_config"
@@ -25,24 +24,27 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    example_file = DeclareLaunchArgument(
-        "example_file",
-        default_value="motion_planning_python_api_tutorial.py",
-        description="Python API tutorial file name",
+    # MODIFIED: Renamed launch argument and updated default value and description
+    data_collector_script = DeclareLaunchArgument(
+        "data_collector_script",
+        default_value="data_collector",
+        description="The python script to execute for data collection.",
     )
 
-    moveit_py_node = Node(
-        name="moveit_py",
-        package="moveit2_tutorials",
-        executable=LaunchConfiguration("example_file"),
+    # MODIFIED: The primary node that runs your data collector script
+    data_collector_node = Node(
+        name="data_collector", # MODIFIED: Node name
+        package=package_name,   # MODIFIED: Your package name
+        executable=LaunchConfiguration("data_collector_script"), # MODIFIED: Use the new launch argument
         output="both",
         parameters=[moveit_config.to_dict()],
     )
 
+    # MODIFIED: Point to an RViz config file within your new package
     rviz_config_file = os.path.join(
-        get_package_share_directory("moveit2_tutorials"),
+        get_package_share_directory(package_name),
         "config",
-        "motion_planning_python_api_tutorial.rviz",
+        "data_collector.rviz",
     )
 
     rviz_node = Node(
@@ -56,6 +58,7 @@ def generate_launch_description():
         ],
     )
 
+    # --- Static nodes for simulation (no changes needed) ---
     static_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -103,8 +106,8 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            example_file,
-            moveit_py_node,
+            data_collector_script,
+            data_collector_node,
             robot_state_publisher,
             ros2_control_node,
             rviz_node,
