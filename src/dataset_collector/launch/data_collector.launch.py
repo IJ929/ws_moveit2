@@ -32,7 +32,7 @@ def generate_launch_description():
     )
 
     moveit_py_node = Node(
-        name="moveit_py1",
+        name="moveit_py",
         package="moveit2_tutorials",
         executable=LaunchConfiguration("example_file"),
         output="both",
