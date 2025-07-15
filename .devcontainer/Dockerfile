@@ -6,5 +6,9 @@ FROM moveit/moveit2:main-humble-tutorial-source
 #     git \
 #     && rm -rf /var/lib/apt/lists/*
 
+# Copy custom bashrc and set it up for root user
+COPY .bashrc /root/.bashrc
+RUN chmod +x /root/.bashrc
+
 # # Source the ROS 2 Humble setup file for the root user.
 # RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc
