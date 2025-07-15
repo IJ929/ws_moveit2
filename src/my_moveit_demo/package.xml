@@ -1,20 +1,22 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>dataset_collector</name>
+  <name>my_moveit_demo</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="ij.huang@tronfuture.com">root</maintainer>
-  <license>TODO: License declaration</license>
-
-  <depend>rclpy</depend>
-  <depend>moveit_py</depend>
-  <depend>geometry_msgs</depend>
+  <description>Reproduce moveit_py demo by creating a package</description>
+  <maintainer email="sandy10203@gmail.com">root</maintainer>
+  <license>Apache-2.0</license>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>moveit2_tutorials</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

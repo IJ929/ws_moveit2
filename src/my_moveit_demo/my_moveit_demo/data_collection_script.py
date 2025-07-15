@@ -15,6 +15,8 @@ from moveit.planning import (
     MoveItPy,
     MultiPipelinePlanRequestParameters,
 )
+from geometry_msgs.msg import PoseStamped
+from moveit.core.kinematic_constraints import construct_joint_constraint
 
 
 def plan_and_execute(
@@ -27,7 +29,7 @@ def plan_and_execute(
 ):
     """Helper function to plan and execute a motion."""
     # plan to goal
-    logger.info("Planning trajectory!!")
+    logger.info("Planning trajectory")
     if multi_plan_parameters is not None:
         plan_result = planning_component.plan(
             multi_plan_parameters=multi_plan_parameters
@@ -41,11 +43,11 @@ def plan_and_execute(
 
     # execute the plan
     if plan_result:
-        logger.info("Executing plan!")
+        logger.info("Executing plan")
         robot_trajectory = plan_result.trajectory
         robot.execute(robot_trajectory, controllers=[])
     else:
-        logger.error("Planning failed!")
+        logger.error("Planning failed")
 
     time.sleep(sleep_time)
 
@@ -105,8 +107,6 @@ def main():
     panda_arm.set_start_state_to_current_state()
 
     # set pose goal with PoseStamped message
-    from geometry_msgs.msg import PoseStamped
-
     pose_goal = PoseStamped()
     pose_goal.header.frame_id = "panda_link0"
     pose_goal.pose.orientation.w = 1.0
@@ -126,8 +126,6 @@ def main():
     panda_arm.set_start_state_to_current_state()
 
     # set constraints message
-    from moveit.core.kinematic_constraints import construct_joint_constraint
-
     joint_values = {
         "panda_joint1": -1.0,
         "panda_joint2": 0.7,

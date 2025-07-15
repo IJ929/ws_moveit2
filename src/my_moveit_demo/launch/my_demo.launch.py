@@ -1,16 +1,13 @@
+# my_demo.launch.py
+# Launch file for the MoveIt2 Python API demo
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
-from launch.substitutions import LaunchConfiguration
+from launch.actions import ExecuteProcess
 from moveit_configs_utils import MoveItConfigsBuilder
 
-
 def generate_launch_description():
-    # MODIFIED: Define the package name
-    package_name = "dataset_collector"
-
     moveit_config = (
         MoveItConfigsBuilder(
             robot_name="panda", package_name="moveit_resources_panda_moveit_config"
@@ -24,20 +21,19 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    # MODIFIED: The primary node that runs your data collector script
-    data_collector_node = Node(
-        name="data_collector", # MODIFIED: Node name
-        package=package_name,   # MODIFIED: Your package name
-        executable="data_collector", # MODIFIED: Use the new launch argument
+    # The main node that runs your Python script
+    moveit_py_node = Node(
+        name="data_collection",
+        package="my_moveit_demo", # Changed to your package name
+        executable="data_collection", # Changed to your executable name (from setup.py)
         output="both",
         parameters=[moveit_config.to_dict()],
     )
 
-    # MODIFIED: Point to an RViz config file within your new package
     rviz_config_file = os.path.join(
-        get_package_share_directory(package_name),
+        get_package_share_directory("moveit2_tutorials"),
         "config",
-        "data_collector.rviz",
+        "motion_planning_python_api_tutorial.rviz",
     )
 
     rviz_node = Node(
@@ -51,7 +47,6 @@ def generate_launch_description():
         ],
     )
 
-    # --- Static nodes for simulation (no changes needed) ---
     static_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -99,7 +94,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            data_collector_node,
+            moveit_py_node,
             robot_state_publisher,
             ros2_control_node,
             rviz_node,
