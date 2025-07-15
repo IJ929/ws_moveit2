@@ -6,7 +6,8 @@
     "runArgs": [
         "--privileged",
         "--net=host",
-        "-e", "DISPLAY=${env:DISPLAY}",
+        "-e",
+        "DISPLAY=${env:DISPLAY}",
         "--device=/dev/dri/:/dev/dri"
     ],
     "workspaceMount": "source=${localWorkspaceFolder},target=/ws_lucas,type=bind",
@@ -17,12 +18,22 @@
                 "ms-vscode.cpptools",
                 "ms-python.python",
                 "ms-iot.vscode-ros"
-            ]
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash",
+                        "args": [
+                            "--login"
+                        ]
+                    }
+                }
+            }
         }
     },
     // This command now runs as root by default.
-    "postCreateCommand": "/bin/bash",
-    
+    "postCreateCommand": "/bin/bash -c 'source /root/.bashrc'",
     // Set 'root' as the default user for the container and VS Code terminals.
     "remoteUser": "root"
 }

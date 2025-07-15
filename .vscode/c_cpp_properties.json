@@ -1,0 +1,62 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/root/ws_moveit/install/robotiq_driver/include/**",
+        "/root/ws_moveit/install/serial/include/**",
+        "/root/ws_moveit/install/moveit_visual_tools/include/**",
+        "/root/ws_moveit/install/rviz_visual_tools/include/**",
+        "/root/ws_moveit/install/moveit_task_constructor_visualization/include/**",
+        "/root/ws_moveit/install/moveit_task_constructor_demo/include/**",
+        "/root/ws_moveit/install/moveit_task_constructor_core/include/**",
+        "/root/ws_moveit/install/rviz_marker_tools/include/**",
+        "/root/ws_moveit/install/robotiq_controllers/include/**",
+        "/root/ws_moveit/install/pilz_industrial_motion_planner_testutils/include/**",
+        "/root/ws_moveit/install/pilz_industrial_motion_planner/include/**",
+        "/root/ws_moveit/install/pick_ik/include/**",
+        "/root/ws_moveit/install/moveit_task_constructor_msgs/include/**",
+        "/root/ws_moveit/install/moveit_ros_control_interface/include/**",
+        "/root/ws_moveit/install/moveit_simple_controller_manager/include/**",
+        "/root/ws_moveit/install/moveit_setup_assistant/include/**",
+        "/root/ws_moveit/install/moveit_setup_srdf_plugins/include/**",
+        "/root/ws_moveit/install/moveit_setup_core_plugins/include/**",
+        "/root/ws_moveit/install/moveit_setup_controllers/include/**",
+        "/root/ws_moveit/install/moveit_setup_app_plugins/include/**",
+        "/root/ws_moveit/install/moveit_setup_framework/include/**",
+        "/root/ws_moveit/install/moveit_servo/include/**",
+        "/root/ws_moveit/install/moveit_ros_visualization/include/**",
+        "/root/ws_moveit/install/moveit_py/include/**",
+        "/root/ws_moveit/install/moveit_hybrid_planning/include/**",
+        "/root/ws_moveit/install/moveit_ros_planning_interface/include/**",
+        "/root/ws_moveit/install/moveit_ros_benchmarks/include/**",
+        "/root/ws_moveit/install/moveit_ros_warehouse/include/**",
+        "/root/ws_moveit/install/moveit_ros_robot_interaction/include/**",
+        "/root/ws_moveit/install/moveit_ros_perception/include/**",
+        "/root/ws_moveit/install/moveit_ros_move_group/include/**",
+        "/root/ws_moveit/install/moveit_planners_ompl/include/**",
+        "/root/ws_moveit/install/moveit_kinematics/include/**",
+        "/root/ws_moveit/install/moveit_ros_planning/include/**",
+        "/root/ws_moveit/install/moveit_ros_occupancy_map_monitor/include/**",
+        "/root/ws_moveit/install/moveit_resources_prbt_ikfast_manipulator_plugin/include/**",
+        "/root/ws_moveit/install/moveit_planners_stomp/include/**",
+        "/root/ws_moveit/install/chomp_motion_planner/include/**",
+        "/root/ws_moveit/install/moveit_core/include/**",
+        "/root/ws_moveit/install/moveit_msgs/include/**",
+        "/root/ws_moveit/install/kortex_driver/include/**",
+        "/root/ws_moveit/install/kortex_api/include/**",
+        "/opt/ros/humble/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
