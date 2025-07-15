@@ -103,3 +103,60 @@ fi
 #if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
 #    . /etc/bash_completion
 #fi
+
+# Please echo a message to indicate that the .bashrc has been sourced
+echo ""
+echo "🤖 ========================================= 🤖"
+echo "🚀 Welcome to your ROS 2 Humble + MoveIt Environment!"
+echo "🐳 Container: $(hostname)"
+echo "📂 Workspace: /ws_lucas"
+echo "🤖 ========================================= 🤖"
+echo ""
+
+# Display environment status
+echo "🔧 Environment Status:"
+echo "   🐍 Python: $(python --version 2>/dev/null || echo 'Not found')"
+echo "   📦 ROS 2: $(ros2 --version 2>/dev/null | head -1 || echo 'Not configured')"
+echo "   🎯 ROS Domain: ${ROS_DOMAIN_ID:-0}"
+echo ""
+
+# Quick commands section
+echo "⚡ Quick Commands:"
+echo "   📋 ros2 topic list           - List all topics"
+echo "   🔍 ros2 node list            - List all nodes"
+echo "   📊 ros2 pkg list             - List all packages"
+echo "   🏥 ros2 doctor                - Check ROS 2 setup"
+echo ""
+
+# Demo launches
+echo "🎮 Demo Robots & Simulations:"
+echo "   🐼 ros2 launch moveit_resources_panda_moveit_config demo.launch.py"
+echo "   🦾 ros2 launch moveit2_tutorials demo.launch.py"
+echo "   🏭 ros2 launch ur_moveit_config ur_moveit.launch.py ur_type:=ur5e"
+echo ""
+
+# Development commands
+echo "🛠️  Development & Testing:"
+echo "   🔨 colcon build --packages-select <package_name>"
+echo "   🧪 colcon test --packages-select <package_name>"
+echo "   🔍 ./test/test_comprehensive.sh"
+echo "   📋 ros2 launch --show-args <launch_file>"
+echo ""
+
+# Workspace commands
+echo "📁 Workspace Management:"
+echo "   🔄 source install/setup.bash  - Source workspace"
+echo "   🧹 rm -rf build/ install/ log/ - Clean workspace"
+echo "   📦 rosdep install --from-paths src --ignore-src -r -y"
+echo ""
+
+# Useful aliases reminder
+echo "🎯 Custom Aliases Available:"
+echo "   📂 ll, la, l                 - Enhanced ls commands"
+echo "   🐍 python → python3          - Python 3 default"
+echo "   📦 pip → pip3                - Pip 3 default"
+echo ""
+
+echo "💡 Tip: Use 'ros2 --help' for more commands!"
+echo "🤖 ========================================= 🤖"
+echo ""
