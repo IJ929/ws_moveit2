@@ -116,7 +116,7 @@ echo ""
 # Display environment status
 echo "🔧 Environment Status:"
 echo "   🐍 Python: $(python --version 2>/dev/null || echo 'Not found')"
-echo "   📦 ROS 2: $(ros2 --version 2>/dev/null | head -1 || echo 'Not configured')"
+echo "   📦 ROS 2: $ROS_DISTRO"
 echo "   🎯 ROS Domain: ${ROS_DOMAIN_ID:-0}"
 echo ""
 
