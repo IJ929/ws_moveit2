@@ -17,8 +17,8 @@
             "extensions": [
                 "ms-vscode.cpptools",
                 "ms-python.python",
-                "ms-iot.vscode-ros",
                 "mechatroner.rainbow-csv",
+                "mhutchie.git-graph"
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "bash",
