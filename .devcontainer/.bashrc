@@ -83,7 +83,7 @@ alias la='ls -A'
 alias l='ls -CF'
 
 alias python='python3'
-alias pip='pip3'
+alias pip='python3 -m pip'
 
 source /opt/ros/humble/setup.bash 
 source /root/ws_moveit/install/setup.bash 

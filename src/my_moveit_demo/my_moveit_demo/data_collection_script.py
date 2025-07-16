@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-A script to outline the fundamentals of the moveit_py motion planning API.
+This script collects joint configurations and end-effector poses of a robot
+and saves them to a CSV file.
 """
 
 import time
-
+import numpy as np
+import pandas as pd
 # generic ros libraries
 import rclpy
 from rclpy.logging import get_logger
@@ -18,38 +20,8 @@ from moveit.planning import (
 from geometry_msgs.msg import PoseStamped
 from moveit.core.kinematic_constraints import construct_joint_constraint
 
-
-def plan_and_execute(
-    robot,
-    planning_component,
-    logger,
-    single_plan_parameters=None,
-    multi_plan_parameters=None,
-    sleep_time=0.0,
-):
-    """Helper function to plan and execute a motion."""
-    # plan to goal
-    logger.info("Planning trajectory")
-    if multi_plan_parameters is not None:
-        plan_result = planning_component.plan(
-            multi_plan_parameters=multi_plan_parameters
-        )
-    elif single_plan_parameters is not None:
-        plan_result = planning_component.plan(
-            single_plan_parameters=single_plan_parameters
-        )
-    else:
-        plan_result = planning_component.plan()
-
-    # execute the plan
-    if plan_result:
-        logger.info("Executing plan")
-        robot_trajectory = plan_result.trajectory
-        robot.execute(robot_trajectory, controllers=[])
-    else:
-        logger.error("Planning failed")
-
-    time.sleep(sleep_time)
+import csv
+import sys
 
 
 def main():
@@ -58,117 +30,73 @@ def main():
     # MoveItPy Setup
     ###################################################################
     rclpy.init()
-    logger = get_logger("moveit_py.pose_goal")
+    logger = get_logger("moveit_py.data_collection")
 
-    # instantiate MoveItPy instance and get planning component
-    panda = MoveItPy(node_name="moveit_py")
-    panda_arm = panda.get_planning_component("panda_arm")
-    logger.info("MoveItPy instance created")
-
-    ###########################################################################
-    # Plan 1 - set states with predefined string
-    ###########################################################################
-
-    # set plan start state using predefined state
-    panda_arm.set_start_state(configuration_name="ready")
-
-    # set pose goal using predefined state
-    panda_arm.set_goal_state(configuration_name="extended")
-
-    # plan to goal
-    plan_and_execute(panda, panda_arm, logger, sleep_time=3.0)
+    try:
+        panda = MoveItPy(node_name="moveit_py")
+        panda_arm = panda.get_planning_component("panda_arm")
+    except Exception as e:
+        logger.error(f"Failed to initialize MoveItPy: {e}")
+        rclpy.shutdown()
+        sys.exit(1)
+    
 
     ###########################################################################
-    # Plan 2 - set goal state with RobotState object
+    # Collecting Data
     ###########################################################################
-
-    # instantiate a RobotState instance using the current robot model
+    logger.info("Data collection has started.")
+    # Get the robot model and create a RobotState object
     robot_model = panda.get_robot_model()
     robot_state = RobotState(robot_model)
+    arm_joint_model_group = robot_model.get_joint_model_group("panda_arm")
+    end_effector_link = "panda_link8"
 
-    # randomize the robot state
-    robot_state.set_to_random_positions()
+    # Collect the data 
+    num_data_points = 50
+    num_dofs = len(arm_joint_model_group.joint_model_names)-1
+    
+    num_end_effector_pose_dimensions = 7  # x, y, z, qx, qy, qz, qw
+    table_data = np.empty((num_data_points, num_dofs + num_end_effector_pose_dimensions), dtype=float)
+    logger.info(f"Collecting {num_data_points} data points...")
 
-    # set plan start state to current state
-    panda_arm.set_start_state_to_current_state()
+    for i in range(num_data_points):
+        logger.info(f"Collecting data point {i + 1}/{num_data_points}...")
+        robot_state.set_to_random_positions(arm_joint_model_group)
+        
+        row_data = []
+        
+        joint_positions = [robot_state.joint_positions[name] for name in arm_joint_model_group.joint_model_names[:-1]]
+        logger.info(f"Joint positions: {joint_positions}")
+        
+        pose = robot_state.get_pose(end_effector_link)
+        ee_pose = [pose.position.x, pose.position.y, pose.position.z,
+                   pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+        logger.info(f"End-Effector Pose: {ee_pose}")
+        row_data.extend(joint_positions)
+        row_data.extend(ee_pose)    
+        table_data[i] = row_data
 
-    # set goal state to the initialized robot state
-    logger.info("Set goal state to the initialized robot state")
-    panda_arm.set_goal_state(robot_state=robot_state)
+    logger.info("Data collection complete.")
 
-    # plan to goal
-    plan_and_execute(panda, panda_arm, logger, sleep_time=3.0)
+    # Define CSV file path and headers
+    csv_file_path = "robot_data.csv"
+    # Corrected line: access .joint_model_names as an attribute
+    joint_names = arm_joint_model_group.joint_model_names[:-1]
+    pose_headers = ["pos_x", "pos_y", "pos_z", "quat_x", "quat_y", "quat_z", "quat_w"]
+    csv_headers = joint_names + pose_headers
 
-    ###########################################################################
-    # Plan 3 - set goal state with PoseStamped message
-    ###########################################################################
+    df = pd.DataFrame(table_data, columns=csv_headers)
+    logger.info(f"Data collected: {df.shape[0]} rows, {df.shape[1]} columns")
 
-    # set plan start state to current state
-    panda_arm.set_start_state_to_current_state()
+    # Write the collected data to the CSV file
+    try:
+        df.to_csv(csv_file_path, index=False)        
+        logger.info(f"Successfully saved data to {csv_file_path}")
 
-    # set pose goal with PoseStamped message
-    pose_goal = PoseStamped()
-    pose_goal.header.frame_id = "panda_link0"
-    pose_goal.pose.orientation.w = 1.0
-    pose_goal.pose.position.x = 0.28
-    pose_goal.pose.position.y = -0.2
-    pose_goal.pose.position.z = 0.5
-    panda_arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="panda_link8")
+    except IOError as e:
+        logger.error(f"Error writing to file {csv_file_path}: {e}")
 
-    # plan to goal
-    plan_and_execute(panda, panda_arm, logger, sleep_time=3.0)
-
-    ###########################################################################
-    # Plan 4 - set goal state with constraints
-    ###########################################################################
-
-    # set plan start state to current state
-    panda_arm.set_start_state_to_current_state()
-
-    # set constraints message
-    joint_values = {
-        "panda_joint1": -1.0,
-        "panda_joint2": 0.7,
-        "panda_joint3": 0.7,
-        "panda_joint4": -1.5,
-        "panda_joint5": -0.7,
-        "panda_joint6": 2.0,
-        "panda_joint7": 0.0,
-    }
-    robot_state.joint_positions = joint_values
-    joint_constraint = construct_joint_constraint(
-        robot_state=robot_state,
-        joint_model_group=panda.get_robot_model().get_joint_model_group("panda_arm"),
-    )
-    panda_arm.set_goal_state(motion_plan_constraints=[joint_constraint])
-
-    # plan to goal
-    plan_and_execute(panda, panda_arm, logger, sleep_time=3.0)
-
-    ###########################################################################
-    # Plan 5 - Planning with Multiple Pipelines simultaneously
-    ###########################################################################
-
-    # set plan start state to current state
-    panda_arm.set_start_state_to_current_state()
-
-    # set pose goal with PoseStamped message
-    panda_arm.set_goal_state(configuration_name="ready")
-
-    # initialise multi-pipeline plan request parameters
-    multi_pipeline_plan_request_params = MultiPipelinePlanRequestParameters(
-        panda, ["ompl_rrtc", "pilz_lin", "chomp_planner"]
-    )
-
-    # plan to goal
-    plan_and_execute(
-        panda,
-        panda_arm,
-        logger,
-        multi_plan_parameters=multi_pipeline_plan_request_params,
-        sleep_time=3.0,
-    )
-
+    rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

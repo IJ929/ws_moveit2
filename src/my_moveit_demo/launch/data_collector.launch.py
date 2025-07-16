@@ -1,4 +1,4 @@
-# my_demo.launch.py
+# data_collector.launch.py
 # Launch file for the MoveIt2 Python API demo
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -23,7 +23,7 @@ def generate_launch_description():
 
     # The main node that runs your Python script
     moveit_py_node = Node(
-        name="data_collection",
+        name="data_collector",
         package="my_moveit_demo", # Changed to your package name
         executable="data_collection", # Changed to your executable name (from setup.py)
         output="both",
