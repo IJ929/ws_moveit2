@@ -14,13 +14,11 @@ from rclpy.logging import get_logger
 # moveit python library
 from moveit.core.robot_state import RobotState
 from moveit.planning import (
-    MoveItPy,
-    MultiPipelinePlanRequestParameters,
+    MoveItPy
 )
 from geometry_msgs.msg import PoseStamped
-from moveit.core.kinematic_constraints import construct_joint_constraint
+# from moveit.core.kinematic_constraints import construct_joint_constraint
 
-import csv
 import sys
 
 
@@ -52,7 +50,7 @@ def main():
     end_effector_link = "panda_link8"
 
     # Collect the data 
-    num_data_points = 50
+    num_data_points = 10
     num_dofs = len(arm_joint_model_group.joint_model_names)-1
     
     num_end_effector_pose_dimensions = 7  # x, y, z, qx, qy, qz, qw
@@ -62,6 +60,7 @@ def main():
     for i in range(num_data_points):
         logger.info(f"Collecting data point {i + 1}/{num_data_points}...")
         robot_state.set_to_random_positions(arm_joint_model_group)
+        robot_state.update()
         
         row_data = []
         
