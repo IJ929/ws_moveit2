@@ -5,3 +5,4 @@ log/
 # ignore python cache files
 __pycache__/
 *.pyc
+*.csv

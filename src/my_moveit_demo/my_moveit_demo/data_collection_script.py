@@ -50,7 +50,7 @@ def main():
     end_effector_link = "panda_link8"
 
     # Collect the data 
-    num_data_points = 10
+    num_data_points = 1000
     num_dofs = len(arm_joint_model_group.joint_model_names)-1
     
     num_end_effector_pose_dimensions = 7  # x, y, z, qx, qy, qz, qw
