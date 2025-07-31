@@ -88,20 +88,31 @@ def train(model, dataloader, optimizer, scheduler, device, epochs, config):
     logging.info("Starting training run...")
     model.train()
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == 'cuda'))
+    accumulation_steps = config.get('accumulation_steps', 1) # Get from config
+
     for epoch in range(epochs):
         total_loss = 0
-        for x_batch, y_batch in dataloader:
+        optimizer.zero_grad() # Move zero_grad() outside the loop
+        
+        for i, (x_batch, y_batch) in enumerate(dataloader):
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-            optimizer.zero_grad(set_to_none=True)
+            
             with torch.cuda.amp.autocast(enabled=(device.type == 'cuda')):
                 log_prob = model(x_batch, y_batch)
                 loss = -log_prob.mean()
+                loss = loss / accumulation_steps # Normalize loss
+
             scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            scaler.step(optimizer)
-            scaler.update()
-            total_loss += loss.item()
+
+            # Perform optimizer step only after accumulating gradients
+            if (i + 1) % accumulation_steps == 0 or (i + 1) == len(dataloader):
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad() # Reset gradients for the next accumulation cycle
+
+            total_loss += loss.item() * accumulation_steps # Un-normalize for logging
         
         avg_loss = total_loss / len(dataloader)
         scheduler.step(avg_loss)
@@ -177,6 +188,9 @@ if __name__ == '__main__':
             },
             'batch_size': {
                 'values': [256, 512, 1024]
+            },
+            'accumulation_steps': { 
+                'values': [1, 2, 4] 
             },
             'num_transforms': {
                 'distribution': 'int_uniform',
