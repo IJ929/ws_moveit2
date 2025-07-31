@@ -1,0 +1,18 @@
+# This file configures the IK solver for the 'panda_arm' planning group.
+# We are specifying the TRAC-IK plugin that you built from source.
+
+panda_arm:
+  # This is the specific name for the TRAC-IK MoveIt plugin.
+  # It's defined in the trac_ik_kinematics_description.xml file within the trac_ik source.
+  kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
+
+  # Optional: You can also set TRAC-IK specific parameters here.
+  # Timeout for the IK solver in seconds.
+  kinematics_solver_timeout: 0.05
+
+  # Search resolution for the IK solver.
+  kinematics_solver_search_resolution: 0.005
+
+  # TRAC-IK specific solve_type parameter.
+  # Options: Speed, Distance, Manipulation1, Manipulation2
+  solve_type: Distance
