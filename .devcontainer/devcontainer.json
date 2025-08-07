@@ -6,14 +6,14 @@
     "runArgs": [
         "--privileged",
         "--net=host",
-        "-e",
-        "DISPLAY=${env:DISPLAY}",
         "--device=/dev/dri/:/dev/dri",
-        "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw"
-        
+        "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "--volume=/home/ij/.Xauthority:/root/.Xauthority:rw"
     ],
     "containerEnv": {
-        "DISPLAY": "${localEnv:DISPLAY}"
+        "DISPLAY": "${localEnv:DISPLAY}",
+        "XAUTHORITY": "/root/.Xauthority"
+
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/ws_lucas,type=bind",
     "workspaceFolder": "/ws_lucas",

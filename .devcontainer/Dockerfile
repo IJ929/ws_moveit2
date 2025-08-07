@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     git \
     python3-pip \
     tree \
+    x11-apps \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy custom bashrc and set it up for root user
