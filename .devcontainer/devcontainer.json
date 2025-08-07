@@ -8,8 +8,13 @@
         "--net=host",
         "-e",
         "DISPLAY=${env:DISPLAY}",
-        "--device=/dev/dri/:/dev/dri"
+        "--device=/dev/dri/:/dev/dri",
+        "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw"
+        
     ],
+    "containerEnv": {
+        "DISPLAY": "${localEnv:DISPLAY}"
+    },
     "workspaceMount": "source=${localWorkspaceFolder},target=/ws_lucas,type=bind",
     "workspaceFolder": "/ws_lucas",
     "customizations": {
