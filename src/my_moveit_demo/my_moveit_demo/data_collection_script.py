@@ -7,6 +7,7 @@ and saves them to a CSV file.
 import time
 import numpy as np
 import pandas as pd
+import tqdm
 # generic ros libraries
 import rclpy
 from rclpy.logging import get_logger
@@ -50,14 +51,14 @@ def main():
     end_effector_link = "panda_link8"
 
     # Collect the data 
-    num_data_points = 1000
+    num_data_points = 5_000_000
     num_dofs = len(arm_joint_model_group.joint_model_names)-1
-    
     num_end_effector_pose_dimensions = 7  # x, y, z, qx, qy, qz, qw
     table_data = np.empty((num_data_points, num_dofs + num_end_effector_pose_dimensions), dtype=float)
     logger.info(f"Collecting {num_data_points} data points...")
 
-    for i in range(num_data_points):
+    tr = tqdm.trange(num_data_points, desc="Collecting Data", unit="point")
+    for i in tr:
         logger.info(f"Collecting data point {i + 1}/{num_data_points}...")
         robot_state.set_to_random_positions(arm_joint_model_group)
         robot_state.update()
@@ -65,12 +66,12 @@ def main():
         row_data = []
         
         joint_positions = [robot_state.joint_positions[name] for name in arm_joint_model_group.joint_model_names[:-1]]
-        logger.info(f"Joint positions: {joint_positions}")
+        # logger.info(f"Joint positions: {joint_positions}")
         
         pose = robot_state.get_pose(end_effector_link)
         ee_pose = [pose.position.x, pose.position.y, pose.position.z,
                    pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
-        logger.info(f"End-Effector Pose: {ee_pose}")
+        # logger.info(f"End-Effector Pose: {ee_pose}")
         row_data.extend(joint_positions)
         row_data.extend(ee_pose)    
         table_data[i] = row_data
@@ -78,7 +79,7 @@ def main():
     logger.info("Data collection complete.")
 
     # Define CSV file path and headers
-    csv_file_path = "robot_data.csv"
+    csv_file_path = "data/panda_arm_training_data.csv"
     # Corrected line: access .joint_model_names as an attribute
     joint_names = arm_joint_model_group.joint_model_names[:-1]
     pose_headers = ["pos_x", "pos_y", "pos_z", "quat_x", "quat_y", "quat_z", "quat_w"]
