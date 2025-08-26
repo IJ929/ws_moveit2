@@ -39,7 +39,7 @@
         }
     },
     // This command now runs as root by default.
-    "postCreateCommand": "/bin/bash -c 'source /root/.bashrc'",
+    "postCreateCommand": "/bin/bash -c '.devcontainer/post-create.sh'",
     // Set 'root' as the default user for the container and VS Code terminals.
     "remoteUser": "root"
 }

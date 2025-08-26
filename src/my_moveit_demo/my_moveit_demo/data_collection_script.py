@@ -43,53 +43,53 @@ def main():
     ###########################################################################
     # Collecting Data
     ###########################################################################
-    logger.info("Data collection has started.")
-    # Get the robot model and create a RobotState object
-    robot_model = panda.get_robot_model()
-    robot_state = RobotState(robot_model)
-    arm_joint_model_group = robot_model.get_joint_model_group("panda_arm")
-    end_effector_link = "panda_link8"
-
-    # Collect the data 
-    num_data_points = 5_000_000
-    num_dofs = len(arm_joint_model_group.joint_model_names)-1
-    num_end_effector_pose_dimensions = 7  # x, y, z, qx, qy, qz, qw
-    table_data = np.empty((num_data_points, num_dofs + num_end_effector_pose_dimensions), dtype=float)
-    logger.info(f"Collecting {num_data_points} data points...")
-
-    tr = tqdm.trange(num_data_points, desc="Collecting Data", unit="point")
-    for i in tr:
-        logger.info(f"Collecting data point {i + 1}/{num_data_points}...")
-        robot_state.set_to_random_positions(arm_joint_model_group)
-        robot_state.update()
-        
-        row_data = []
-        
-        joint_positions = [robot_state.joint_positions[name] for name in arm_joint_model_group.joint_model_names[:-1]]
-        # logger.info(f"Joint positions: {joint_positions}")
-        
-        pose = robot_state.get_pose(end_effector_link)
-        ee_pose = [pose.position.x, pose.position.y, pose.position.z,
-                   pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
-        # logger.info(f"End-Effector Pose: {ee_pose}")
-        row_data.extend(joint_positions)
-        row_data.extend(ee_pose)    
-        table_data[i] = row_data
-
-    logger.info("Data collection complete.")
-
-    # Define CSV file path and headers
-    csv_file_path = "data/panda_arm_training_data.csv"
-    # Corrected line: access .joint_model_names as an attribute
-    joint_names = arm_joint_model_group.joint_model_names[:-1]
-    pose_headers = ["pos_x", "pos_y", "pos_z", "quat_x", "quat_y", "quat_z", "quat_w"]
-    csv_headers = joint_names + pose_headers
-
-    df = pd.DataFrame(table_data, columns=csv_headers)
-    logger.info(f"Data collected: {df.shape[0]} rows, {df.shape[1]} columns")
-
-    # Write the collected data to the CSV file
     try:
+        
+        logger.info("Data collection has started.")
+        # Get the robot model and create a RobotState object
+        robot_model = panda.get_robot_model()
+        robot_state = RobotState(robot_model)
+        arm_joint_model_group = robot_model.get_joint_model_group("panda_arm")
+        end_effector_link = "panda_link8"
+
+        # Collect the data 
+        num_data_points = 5_000_000
+        num_dofs = len(arm_joint_model_group.joint_model_names)-1
+        num_end_effector_pose_dimensions = 7  # x, y, z, qx, qy, qz, qw
+        table_data = np.empty((num_data_points, num_dofs + num_end_effector_pose_dimensions), dtype=float)
+        logger.info(f"Collecting {num_data_points} data points...")
+
+        tr = tqdm.trange(num_data_points, desc="Collecting Data", unit="point")
+        for i in tr:
+            robot_state.set_to_random_positions(arm_joint_model_group)
+            robot_state.update()
+            
+            row_data = []
+            
+            joint_positions = [robot_state.joint_positions[name] for name in arm_joint_model_group.joint_model_names[:-1]]
+            # logger.info(f"Joint positions: {joint_positions}")
+            
+            pose = robot_state.get_pose(end_effector_link)
+            ee_pose = [pose.position.x, pose.position.y, pose.position.z,
+                    pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+            # logger.info(f"End-Effector Pose: {ee_pose}")
+            row_data.extend(joint_positions)
+            row_data.extend(ee_pose)    
+            table_data[i] = row_data
+
+        logger.info("Data collection complete.")
+
+        # Define CSV file path and headers
+        csv_file_path = "data/panda_arm_training_data.csv"
+        # Corrected line: access .joint_model_names as an attribute
+        joint_names = arm_joint_model_group.joint_model_names[:-1]
+        pose_headers = ["pos_x", "pos_y", "pos_z", "quat_x", "quat_y", "quat_z", "quat_w"]
+        csv_headers = joint_names + pose_headers
+
+        df = pd.DataFrame(table_data, columns=csv_headers)
+        logger.info(f"Data collected: {df.shape[0]} rows, {df.shape[1]} columns")
+
+        # Write the collected data to the CSV file
         df.to_csv(csv_file_path, index=False)        
         logger.info(f"Successfully saved data to {csv_file_path}")
 
@@ -99,11 +99,11 @@ def main():
     # Properly clean up objects before shutdown
     finally:
         logger.info("Cleaning up resources...")
-        if 'robot_state' in locals():
+        if robot_state:
             del robot_state
-        if 'arm_joint_model_group' in locals():
+        if arm_joint_model_group:
             del arm_joint_model_group
-        if 'robot_model' in locals():
+        if robot_model:
             del robot_model
         if panda_arm:
             del panda_arm
