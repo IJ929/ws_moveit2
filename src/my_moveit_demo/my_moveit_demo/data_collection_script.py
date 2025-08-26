@@ -82,7 +82,7 @@ def main():
         # Define CSV file path and headers
         csv_file_path = "data/panda_arm_training_data.csv"
         # Corrected line: access .joint_model_names as an attribute
-        joint_names = arm_joint_model_group.joint_model_names[:-1]
+        joint_names = [f'joint{id+1}' for id in range(len(arm_joint_model_group.joint_model_names[:-1]))]  
         pose_headers = ["pos_x", "pos_y", "pos_z", "quat_x", "quat_y", "quat_z", "quat_w"]
         csv_headers = joint_names + pose_headers
 
