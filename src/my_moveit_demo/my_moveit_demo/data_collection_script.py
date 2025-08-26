@@ -96,6 +96,23 @@ def main():
     except IOError as e:
         logger.error(f"Error writing to file {csv_file_path}: {e}")
 
+    # Properly clean up objects before shutdown
+    finally:
+        logger.info("Cleaning up resources...")
+        if 'robot_state' in locals():
+            del robot_state
+        if 'arm_joint_model_group' in locals():
+            del arm_joint_model_group
+        if 'robot_model' in locals():
+            del robot_model
+        if panda_arm:
+            del panda_arm
+        if panda:
+            del panda
+        
+        # Give some time for cleanup
+        time.sleep(0.1)
+
     rclpy.shutdown()
 
 if __name__ == "__main__":
