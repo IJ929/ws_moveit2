@@ -20,11 +20,14 @@ DATASET_PATH = 'data/panda_arm_training_data_pinocchio.csv'
 # Hyperparameters
 INPUT_DIM = 7   # 7 joints for Panda arm
 NUM_EPOCHS = 13
-BATCH_SIZE = 256
+BATCH_SIZE = 2048
 LEARNING_RATE = 1e-4
+LEARNING_RATE_DECAY = 8e-1
 NUM_TRANSFORMS = 7
+HIDDEN_DIMS = [1024, 1024, 1024]
 SPLINE_BINS = 8
 MODEL_PATH = 'models/conditional_nf_model.pth'
+BASE_DIST_SCALE = 0.5
 
 class NumpyStandardScaler:
     def __init__(self):
@@ -34,6 +37,7 @@ class NumpyStandardScaler:
     def fit_transform(self, data):
         self.mean_ = np.mean(data, axis=0)
         self.std_ = np.std(data, axis=0)
+        self.std_ += 1e-6  # prevent division by zero
         return (data - self.mean_) / self.std_
     
     def transform(self, data):
@@ -78,7 +82,7 @@ class ConditionalNormalizingFlow(nn.Module):
 
         # Register base distribution parameters as buffers to ensure they are moved to the correct device
         self.register_buffer('base_dist_loc', torch.zeros(input_dim))
-        self.register_buffer('base_dist_scale', torch.ones(input_dim))
+        self.register_buffer('base_dist_scale', torch.ones(input_dim) * BASE_DIST_SCALE)
         
         # Store the learnable (nn.Module) transforms and the permutation tensors (as buffers)
         self.transform_modules = nn.ModuleList()
@@ -87,7 +91,7 @@ class ConditionalNormalizingFlow(nn.Module):
             self.transform_modules.append(T.conditional_spline_autoregressive(
                 input_dim=input_dim,
                 context_dim=cond_dim,
-                hidden_dims=[256, 256],
+                hidden_dims=HIDDEN_DIMS,
                 count_bins=spline_bins,
                 bound=input_dim // 2
             ))
@@ -156,9 +160,9 @@ def train(model, dataloader, optimizer, scheduler, device, epochs, robot: RobotM
     model.train()
     scaler = torch.amp.GradScaler('cuda', enabled=(device.type == 'cuda'))
     best_loss = float('inf')
+    total_loss = 0
+    n_steps = 0
     for epoch in range(epochs):
-        total_loss = 0
-        n_steps = 0
         process_bar = tqdm(dataloader, total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}", unit="batch")
         for x_batch, y_batch in process_bar:
             optimizer.zero_grad(set_to_none=True)
@@ -173,13 +177,13 @@ def train(model, dataloader, optimizer, scheduler, device, epochs, robot: RobotM
             total_loss += loss.item()
             
             n_steps += 1
-            if n_steps > 2_000:
+            if n_steps > 50:
                 avg_loss = total_loss / n_steps
                 scheduler.step(avg_loss)
                 total_loss = 0
                 n_steps = 0
                 best_loss = save_if_better(model, avg_loss, best_loss, MODEL_PATH)
-                err_norm = test_ik_solutions(model, robot, dataset, num_samples=10, num_solutions=10)
+                err_norm = test_ik_solutions(model, robot, dataset, num_samples=100, num_solutions=30)
                 process_bar.set_postfix({'Avg Loss': f"{avg_loss:.2e}, Err (m): {err_norm:.2e}"})
                 model.train()
     logging.info("Training finished.")
@@ -248,6 +252,7 @@ if __name__ == '__main__':
         dataset, 
         batch_size=BATCH_SIZE, 
         shuffle=True,
+        drop_last=True,
     )
     
     # %%
@@ -258,7 +263,7 @@ if __name__ == '__main__':
         spline_bins=SPLINE_BINS
     ).to(device)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=LEARNING_RATE_DECAY)
     scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=3, verbose=True)
 
 

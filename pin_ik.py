@@ -54,6 +54,13 @@ def test_dataset_generation(csv_path, model, ee_frame_id):
                         'pos_x', 'pos_y', 'pos_z', 'quat_x', 'quat_y', 'quat_z', 'quat_w']
     if list(df.columns) != expected_columns:
         raise ValueError(f"CSV columns do not match expected format. Found: {list(df.columns)}")
+    
+    # check any nan or inf values
+    if df.isnull().values.any():
+        raise ValueError("CSV contains NaN values.")
+    if np.isinf(df.values).any():
+        raise ValueError("CSV contains Inf values.")
+    
     df = df.head(1000)  # Use a subset for quicker evaluation
 
     # compute the error of each row
