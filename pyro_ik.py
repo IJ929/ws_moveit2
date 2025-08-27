@@ -81,7 +81,7 @@ class ConditionalNormalizingFlow(nn.Module):
                 hidden_dims=Config.HIDDEN_DIMS,
                 count_bins=Config.SPLINE_BINS,
                 bound=input_dim // 2,
-                # order='quadratic'
+                order='quadratic'
             ) for _ in range(Config.NUM_TRANSFORMS)
         ])
         
