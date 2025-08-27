@@ -3,31 +3,28 @@ import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
-import pyro
 import pyro.distributions as dist
 import pyro.distributions.transforms as T
 from torch.utils.data import Dataset, DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-import os
 import time
 import logging
 from pin_ik import RobotModel
-from tqdm import tqdm, trange # Import the logging module
+from tqdm import tqdm
 
-# --- 1. Configuration ---
-# Ensure the dataset file exists. If not, create a dummy one for demonstration.
-DATASET_PATH = 'data/panda_arm_training_data_pinocchio.csv'
-# Hyperparameters
-INPUT_DIM = 7   # 7 joints for Panda arm
-NUM_EPOCHS = 13
-BATCH_SIZE = 2048
-LEARNING_RATE = 1e-4
-LEARNING_RATE_DECAY = 8e-1
-NUM_TRANSFORMS = 7
-HIDDEN_DIMS = [1024, 1024, 1024]
-SPLINE_BINS = 8
-MODEL_PATH = 'models/conditional_nf_model.pth'
-BASE_DIST_SCALE = 0.5
+# --- Configuration ---
+class Config:
+    DATASET_PATH = 'data/panda_arm_training_data_pinocchio.csv'
+    INPUT_DIM = 7
+    NUM_EPOCHS = 13
+    BATCH_SIZE = 2048
+    LEARNING_RATE = 1e-4
+    LEARNING_RATE_DECAY = 8e-1
+    NUM_TRANSFORMS = 7
+    HIDDEN_DIMS = [1024, 1024, 1024]
+    SPLINE_BINS = 8
+    MODEL_PATH = 'models/conditional_nf_model.pth'
+    BASE_DIST_SCALE = 0.5
 
 class NumpyStandardScaler:
     def __init__(self):
@@ -36,8 +33,7 @@ class NumpyStandardScaler:
     
     def fit_transform(self, data):
         self.mean_ = np.mean(data, axis=0)
-        self.std_ = np.std(data, axis=0)
-        self.std_ += 1e-6  # prevent division by zero
+        self.std_ = np.std(data, axis=0) + 1e-6  # prevent division by zero
         return (data - self.mean_) / self.std_
     
     def transform(self, data):
@@ -46,24 +42,21 @@ class NumpyStandardScaler:
     def inverse_transform(self, data):
         return data * self.std_ + self.mean_
 
-# --- 2. Custom PyTorch Dataset ---
 class IKDataset(Dataset):
     """Dataset for loading Panda IK data."""
     def __init__(self, csv_file):
         df = pd.read_csv(csv_file)
-        joint_cols = [f'joint{i+1}' for i in range(INPUT_DIM)]
+        joint_cols = [f'joint{i+1}' for i in range(Config.INPUT_DIM)]
         pose_cols = ['pos_x', 'pos_y', 'pos_z', 'quat_x', 'quat_y', 'quat_z', 'quat_w']
-        self.x_data = df[joint_cols].values.astype(np.float32)
-        self.y_data = df[pose_cols].values.astype(np.float32)
+        
         self.x_scaler = NumpyStandardScaler()
         self.y_scaler = NumpyStandardScaler()
-        self.x_data = self.x_scaler.fit_transform(self.x_data)
-        self.y_data = self.y_scaler.fit_transform(self.y_data)
         
-        # move data to GPU if available
-        if torch.cuda.is_available():
-            self.x_data = torch.from_numpy(self.x_data).to('cuda')
-            self.y_data = torch.from_numpy(self.y_data).to('cuda')
+        x_data = self.x_scaler.fit_transform(df[joint_cols].values.astype(np.float32))
+        y_data = self.y_scaler.fit_transform(df[pose_cols].values.astype(np.float32))
+        
+        self.x_data = torch.from_numpy(x_data)
+        self.y_data = torch.from_numpy(y_data)
 
     def __len__(self):
         return len(self.x_data)
@@ -71,228 +64,164 @@ class IKDataset(Dataset):
     def __getitem__(self, idx):
         return self.x_data[idx], self.y_data[idx]
 
-# --- 3. Advanced Conditional Normalizing Flow Model ---
 class ConditionalNormalizingFlow(nn.Module):
-    """An advanced Conditional Normalizing Flow model using Spline transforms and Permutations."""
-    def __init__(self, input_dim, cond_dim, num_transforms, spline_bins):
+    """Conditional Normalizing Flow model using Spline transforms and Permutations."""
+    def __init__(self, input_dim, cond_dim):
         super().__init__()
         self.input_dim = input_dim
         self.cond_dim = cond_dim
-        self.num_transforms = num_transforms
 
-        # Register base distribution parameters as buffers to ensure they are moved to the correct device
         self.register_buffer('base_dist_loc', torch.zeros(input_dim))
-        self.register_buffer('base_dist_scale', torch.ones(input_dim) * BASE_DIST_SCALE)
+        self.register_buffer('base_dist_scale', torch.ones(input_dim) * Config.BASE_DIST_SCALE)
         
-        # Store the learnable (nn.Module) transforms and the permutation tensors (as buffers)
-        self.transform_modules = nn.ModuleList()
-        for i in range(num_transforms):
-            # The spline autoregressive transform is an nn.Module
-            self.transform_modules.append(T.conditional_spline_autoregressive(
+        self.transform_modules = nn.ModuleList([
+            T.conditional_spline_autoregressive(
                 input_dim=input_dim,
                 context_dim=cond_dim,
-                hidden_dims=HIDDEN_DIMS,
-                count_bins=spline_bins,
-                bound=input_dim // 2
-            ))
-            # For the Permute transform, we only store its permutation tensor as a buffer
-            if i < num_transforms - 1:
-                buffer_name = f'perm_buffer_{i}'
-                self.register_buffer(buffer_name, torch.randperm(input_dim, dtype=torch.long))
+                hidden_dims=Config.HIDDEN_DIMS,
+                count_bins=Config.SPLINE_BINS,
+                bound=input_dim // 2,
+                # order='quadratic'
+            ) for _ in range(Config.NUM_TRANSFORMS)
+        ])
+        
+        # Store permutation buffers
+        for i in range(Config.NUM_TRANSFORMS - 1):
+            self.register_buffer(f'perm_buffer_{i}', torch.randperm(input_dim, dtype=torch.long))
 
     def _build_flow(self):
-        """
-        Dynamically builds the list of transforms and the distribution on the correct device.
-        This is called during the forward pass to ensure device consistency.
-        """
+        """Build the flow distribution on the correct device."""
         transforms = []
-        for i in range(self.num_transforms):
-            # Append the spline module from our stored list
+        for i in range(Config.NUM_TRANSFORMS):
             transforms.append(self.transform_modules[i])
-            
-            # Create and append a *new* Permute transform using the buffer, which is now on the correct device
-            if i < self.num_transforms - 1:
-                buffer_name = f'perm_buffer_{i}'
-                perm_tensor = getattr(self, buffer_name)
+            if i < Config.NUM_TRANSFORMS - 1:
+                perm_tensor = getattr(self, f'perm_buffer_{i}')
                 transforms.append(T.Permute(perm_tensor))
             
-        # Create the base distribution using the buffers, which are now on the correct device
         base_dist = dist.Normal(self.base_dist_loc, self.base_dist_scale)
-        # Return the complete, device-aware distribution
         return dist.ConditionalTransformedDistribution(base_dist, transforms)
 
     def forward(self, x, y):
-        # Lazily build the flow distribution on the correct device
         flow = self._build_flow()
-        conditioned_flow = flow.condition(y)
-        return conditioned_flow.log_prob(x)
+        return flow.condition(y).log_prob(x)
 
     def sample(self, y, num_samples=1):
         with torch.no_grad():
-            # Lazily build the flow distribution on the correct device
             flow = self._build_flow()
-            conditioned_flow = flow.condition(y)
-            return conditioned_flow.sample(torch.Size([num_samples]))
-        
-def save_model(model, path):
-    """Saves the model state dictionary to the specified path."""
-    model.eval()
-    torch.save(model.state_dict(), path)
-    logging.info(f"Model saved to {path}")
-    
-def save_if_better(model, current_loss, best_loss, path):
-    """Saves the model if the current loss is better than the best loss."""
+            return flow.condition(y).sample(torch.Size([num_samples]))
+
+def save_model_if_better(model, current_loss, best_loss, path):
+    """Save model if current loss is better than best loss."""
     if current_loss < best_loss:
-        save_model(model, path)
+        torch.save(model.state_dict(), path)
+        logging.info(f"Model saved to {path} with loss: {current_loss:.2e}")
         return current_loss
     return best_loss
-    
-def load_model(model, path, device):
-    """Loads the model state dictionary from the specified path."""
-    model.load_state_dict(torch.load(path, map_location=device))
-    model.to(device)
-    logging.info(f"Model loaded from {path}")
 
-# --- 4. Advanced Training and Inference ---
-def train(model, dataloader, optimizer, scheduler, device, epochs, robot: RobotModel):
-    """Main training loop with advanced features."""
-    logging.info("Starting training with advanced methods...")
+def train(model, dataloader, optimizer, scheduler, device, robot):
+    """Main training loop."""
+    logging.info("Starting training...")
     model.train()
     scaler = torch.amp.GradScaler('cuda', enabled=(device.type == 'cuda'))
     best_loss = float('inf')
     total_loss = 0
     n_steps = 0
-    for epoch in range(epochs):
-        process_bar = tqdm(dataloader, total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}", unit="batch")
-        for x_batch, y_batch in process_bar:
+    
+    for epoch in range(Config.NUM_EPOCHS):
+        pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{Config.NUM_EPOCHS}")
+        
+        for x_batch, y_batch in pbar:
+            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+            
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast('cuda', enabled=(device.type == 'cuda')):
                 log_prob = model(x_batch, y_batch)
                 loss = -log_prob.mean()
+            
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             scaler.step(optimizer)
             scaler.update()
-            total_loss += loss.item()
             
+            total_loss += loss.item()
             n_steps += 1
+            
             if n_steps > 50:
                 avg_loss = total_loss / n_steps
                 scheduler.step(avg_loss)
-                total_loss = 0
-                n_steps = 0
-                best_loss = save_if_better(model, avg_loss, best_loss, MODEL_PATH)
-                err_norm = test_ik_solutions(model, robot, dataset, num_samples=100, num_solutions=30)
-                process_bar.set_postfix({'Avg Loss': f"{avg_loss:.2e}, Err (m): {err_norm:.2e}"})
+                best_loss = save_model_if_better(model, avg_loss, best_loss, Config.MODEL_PATH)
+                err_norm = test_ik_solutions(model, robot, dataset, 100, 30)
+                pbar.set_postfix({'Loss': f"{avg_loss:.2e}", 'Err': f"{err_norm:.2e}"})
+                total_loss = n_steps = 0
                 model.train()
+    
     logging.info("Training finished.")
 
 def generate_ik_solutions(model, pose, dataset, device, num_solutions=10):
-    """Generates IK solutions for a given pose using the trained model."""
+    """Generate IK solutions for a given pose."""
     model.eval()
     pose_normalized = dataset.y_scaler.transform(pose.reshape(1, -1))
     pose_tensor = torch.from_numpy(pose_normalized.astype(np.float32)).to(device)
-    joint_samples_normalized = model.sample(pose_tensor, num_samples=num_solutions)
-    joint_samples_unscaled = dataset.x_scaler.inverse_transform(joint_samples_normalized.cpu().numpy())
-    return joint_samples_unscaled
+    joint_samples = model.sample(pose_tensor, num_samples=num_solutions)
+    return dataset.x_scaler.inverse_transform(joint_samples.cpu().numpy())
 
-def generate_ik_solutions_robot(robot: RobotModel, target_pose, num_solutions=10):
-    """Generates IK solutions for a given pose using the robot model."""
-    ik_solutions = []
-    for _ in range(num_solutions):
-        suc, sol, err_norm, max_iter= robot.inverse_kinematics(target_pose)
-        ik_solutions.append(sol)
-    return ik_solutions
-
-def test_ik_solutions(model, robot: RobotModel, dataset, num_samples=10, num_solutions=10):
-    """Tests the IK solutions generated by the model."""
+def test_ik_solutions(model, robot, dataset, num_samples=10, num_solutions=10):
+    """Test IK solutions generated by the model."""
     model.eval()
     random_configs = robot.sample_random_configurations(num_samples)
-    test_poses = [robot.forward_kinematics(q) for q in random_configs]
+    errors = []
     
-    err_arr = np.empty((num_samples, num_solutions))    
-    for i in range(num_samples):
-        target_pose = test_poses[i]
-
-        target_pose = robot.convert_se3_to_pose(target_pose)
+    for config in random_configs:
+        target_pose_se3 = robot.forward_kinematics(config)
+        target_pose = robot.convert_se3_to_pose(target_pose_se3)
         ik_solutions = generate_ik_solutions(model, target_pose, dataset, device, num_solutions)
-        target_pose = robot.convert_pose_to_se3(target_pose)
-        # ik_solutions = generate_ik_solutions_robot(robot, target_pose, num_solutions)
         
-        # Evaluate each solution
-        for j, sol in enumerate(ik_solutions):
+        for sol in ik_solutions:
             current_pose = robot.forward_kinematics(sol)
-            err = robot.compute_se3_error(current_pose, target_pose)
-            error_norm = np.linalg.norm(err)
-            err_arr[i, j] = error_norm
-    err_arr = err_arr.flatten()
-    df_err = pd.DataFrame(err_arr, columns=['Pose Error (m)'])
-    logging.info(f"IK Solution Error Statistics:\n{df_err.describe()}")
-    avg_err = df_err['Pose Error (m)'].mean()
-    return avg_err
+            err = robot.compute_se3_error(current_pose, target_pose_se3)
+            errors.append(np.linalg.norm(err))
+    
+    avg_error = np.mean(errors)
+    logging.info(f"Average IK error: {avg_error:.2e} m")
+    return avg_error
 
-# %% 
-# --- 5. Main Execution ---
 if __name__ == '__main__':
-    # --- Configure Logging ---
-    # This sets up logging to output to the console with a timestamp and log level.
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()] 
-    )
-
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info(f"Using device: {device}")
 
-    # %%
-    dataset = IKDataset(DATASET_PATH)
-    dataloader = DataLoader(
-        dataset, 
-        batch_size=BATCH_SIZE, 
-        shuffle=True,
-        drop_last=True,
-    )
+    dataset = IKDataset(Config.DATASET_PATH)
+    dataloader = DataLoader(dataset, batch_size=Config.BATCH_SIZE, shuffle=True, drop_last=True)
     
-    # %%
-    model = ConditionalNormalizingFlow(
-        input_dim=INPUT_DIM, 
-        cond_dim=dataset.y_data.shape[1],
-        num_transforms=NUM_TRANSFORMS,
-        spline_bins=SPLINE_BINS
-    ).to(device)
-    
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=LEARNING_RATE_DECAY)
+    model = ConditionalNormalizingFlow(Config.INPUT_DIM, dataset.y_data.shape[1]).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=Config.LEARNING_RATE_DECAY)
     scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=3, verbose=True)
 
-
-    #%%
     robot = RobotModel('panda', joints_to_lock_names=['panda_finger_joint1', 'panda_finger_joint2'])
 
-    #%%
-    test_ik_solutions(model, robot, dataset, num_samples=10, num_solutions=10)
+    # Initial test
+    test_ik_solutions(model, robot, dataset, 10, 10)
 
-    # %%
-    train(model, dataloader, optimizer, scheduler, device, epochs=NUM_EPOCHS, robot=robot)
+    # Training
+    train(model, dataloader, optimizer, scheduler, device, robot)
 
-    # %%
-    # --- DEMONSTRATION OF INFERENCE ---
+    # Demonstration
     logging.info("--- IK Solver Demonstration ---")
-    original_df = pd.read_csv(DATASET_PATH)
+    original_df = pd.read_csv(Config.DATASET_PATH)
     pose_cols = ['pos_x', 'pos_y', 'pos_z', 'quat_x', 'quat_y', 'quat_z', 'quat_w']
     test_pose = original_df[pose_cols].iloc[42].values
     
-    logging.info(f"Target End-Effector Pose:\n{test_pose}")
-
-    # %%
+    logging.info(f"Target pose: {test_pose}")
+    
     start_time = time.time()
-    ik_solutions = generate_ik_solutions(model, test_pose, dataset, device, num_solutions=5)
+    ik_solutions = generate_ik_solutions(model, test_pose, dataset, device, 5)
     end_time = time.time()
     
-    logging.info(f"Generated 5 diverse joint configurations in {end_time - start_time:.6f} seconds:")
+    logging.info(f"Generated 5 solutions in {end_time - start_time:.6f} seconds:")
     for i, sol in enumerate(ik_solutions):
         logging.info(f"Solution {i+1}: {np.round(sol, 4)}")
 
-    logging.info("Model training and demonstration complete.")
+    logging.info("Complete.")
 # %%
