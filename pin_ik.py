@@ -105,7 +105,6 @@ def build_model(robot_name, urdf_path=None, joints_to_lock_names=None, q0_full=N
     
     return model
 
-
 def forward_kinematics(model, q, ee_frame_id):
     """
     Compute the forward kinematics for a given joint configuration.
@@ -121,9 +120,9 @@ def forward_kinematics(model, q, ee_frame_id):
     pinocchio.updateFramePlacement(model, data, ee_frame_id)
     return data.oMf[ee_frame_id]
 
-def compute_pose_error(current_pose, target_pose):
+def compute_se3_error(current_pose, target_pose):
     """
-    Compute the pose error between current and target poses.
+    Compute the SE3 error between current and target poses.
     Args:
         current_pose: Current SE3 pose
         target_pose: Target SE3 pose
@@ -160,7 +159,7 @@ def inverse_kinematics(model, ee_frame_id, target_pose, q_init=None,
         forward_kinematics(model, q, ee_frame_id)
         
         # Compute pose error
-        err = compute_pose_error(data.oMf[ee_frame_id], target_pose)
+        err = compute_se3_error(data.oMf[ee_frame_id], target_pose)
         err_norm = norm(err)
         
         # Check convergence
@@ -204,6 +203,76 @@ def test_inverse_kinematics(model, ee_frame_id):
 
     print(f"Desired position: {target_pose.translation.T}")
     print(f"Achieved position: {achieved_pose.translation.T}")
+
+class RobotModel:
+    def __init__(self, robot_name, urdf_path=None, joints_to_lock_names=None, q0_full=None):
+        self.model = build_model(robot_name, urdf_path, joints_to_lock_names, q0_full)
+        self.ee_frame_id = self.model.getFrameId('panda_finger_joint1')
+        
+    def sample_random_configurations(self, num_samples=1):
+        return np.random.uniform(self.model.lowerPositionLimit, self.model.upperPositionLimit, (num_samples, self.model.nq))
+    
+    def convert_pose_to_se3(self, pose):
+        pos = pose[:3]
+        quat = pose[3:]
+        R = pinocchio.Quaternion(quat[3], quat[0], quat[1], quat[2]).toRotationMatrix()
+        return pinocchio.SE3(R, pos)
+    
+    def convert_se3_to_pose(self, se3):
+        pos = se3.translation
+        quat = pinocchio.Quaternion(se3.rotation).coeffs()
+        pose = np.array(list(pos) + list(quat))
+        return pose
+
+    def forward_kinematics(self, q):
+        """
+        Compute the forward kinematics for a given joint configuration.
+        Args:
+            q: Joint configuration
+        Returns:
+            SE3: End-effector pose
+        """
+        return forward_kinematics(self.model, q, self.ee_frame_id)
+    
+    def inverse_kinematics(self, target_pose, q_init=None, 
+                           eps=1e-4, max_iter=1000, dt=1e-1, damp=1e-6, verbose=False):
+        """
+        Solve inverse kinematics for a given target pose.
+        Args:
+            target_pose: Desired SE3 pose
+            q_init: Initial joint configuration (default: neutral)
+            eps: Convergence tolerance
+            max_iter: Maximum iterations
+            dt: Integration time step
+            damp: Damping factor for pseudo-inverse
+            verbose: Print iteration progress
+        Returns:
+            tuple: (success, q_final, error_norm, iterations)"""
+        return inverse_kinematics(self.model, self.ee_frame_id, target_pose, q_init, eps, max_iter, dt, damp, verbose)
+    
+    def compute_pose_error(self, current_pose, target_pose):
+        """
+        Compute the pose error between current and target poses.
+        Args:
+            current_pose: Current translation, quaternion pose
+            target_pose: Target SE3 pose
+        Returns:
+            err: Pose error vector
+        """
+        current_se3 = self.convert_pose_to_se3(current_pose)
+        target_se3 = self.convert_pose_to_se3(target_pose)
+        return self.compute_se3_error(current_se3, target_se3)
+
+    def compute_se3_error(self, current_pose, target_pose):
+        """
+        Compute the pose error between current and target poses.
+        Args:
+            current_pose: Current SE3 pose
+            target_pose: Target SE3 pose
+        Returns:
+            err: Pose error vector
+        """
+        return compute_se3_error(current_pose, target_pose)
 
 #%%
 if __name__ == "__main__":
